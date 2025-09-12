@@ -17,7 +17,7 @@ export const metadata = {
   title: "Hikari",
   description: "Moliyaviy boshqaruv uchun Next.js ilovasi",
   icons: {
-    icon: "https://i.pinimg.com/736x/f4/23/b5/f423b57479009fe7057ab06bebafc6ed.jpg",
+    icon: "https://i.pinimg.com/1200x/d1/7c/bf/d17cbf464feeb23ffd4f83fb1dd7dbba.jpg",
   },
 };
 
