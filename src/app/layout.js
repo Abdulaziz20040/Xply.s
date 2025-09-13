@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Hikari",
+  title: "Xply",
   description: "Moliyaviy boshqaruv uchun Next.js ilovasi",
   icons: {
     icon: "https://i.pinimg.com/1200x/d1/7c/bf/d17cbf464feeb23ffd4f83fb1dd7dbba.jpg",
