@@ -20,7 +20,7 @@ export const metadata = {
   icons: {
     icon: [
       {
-        url: "https://i.pinimg.com/1200x/d1/7c/bf/d17cbf464feeb23ffd4f83fb1dd7dbba.jpg",
+        url: "https://i.pinimg.com/736x/94/dc/7c/94dc7c43f7d392c66ba5a6abf6a37c1c.jpg",
         type: "image/png",
       },
     ],
