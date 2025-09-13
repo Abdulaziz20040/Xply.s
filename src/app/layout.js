@@ -15,9 +15,15 @@ const geistMono = Geist_Mono({
 
 export const metadata = {
   title: "Xply",
-  description: "Moliyaviy boshqaruv uchun Next.js ilovasi",
+  description:
+    "Xply — kunlik vazifalarni nazorat qilish uchun Next.js ilovasi. Siz vazifalarni bajarish orqali darajangizni (level) oshirishingiz mumkin.",
   icons: {
-    icon: "https://i.pinimg.com/1200x/d1/7c/bf/d17cbf464feeb23ffd4f83fb1dd7dbba.jpg",
+    icon: [
+      {
+        url: "https://i.pinimg.com/1200x/d1/7c/bf/d17cbf464feeb23ffd4f83fb1dd7dbba.jpg",
+        type: "image/png",
+      },
+    ],
   },
 };
 
