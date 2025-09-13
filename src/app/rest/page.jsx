@@ -63,15 +63,13 @@ const DamOlishPage = () => {
         setSelectedTask(task);
         setHours(1);
         setMinutes(0);
-        // price va xp boshlang'ich qiymatlari
-        setPrice(task.price || 1000); // default qiymat
-        setXp(task.xp || 1); // default XP
+        setPrice(task.price || 1000);
+        setXp(task.xp || 1);
         setModalOpen(true);
     };
 
     // Narx va XP ni hisoblash
     const calculatePriceXP = (totalHours) => {
-        // Oddiy formula: 1 soat = boshlang'ich narx va XP, max 3 soatga yetadi
         const basePrice = selectedTask.price || 1000;
         const baseXP = selectedTask.xp || 1;
         const newPrice = Math.round(basePrice * totalHours);
@@ -79,6 +77,11 @@ const DamOlishPage = () => {
 
         setPrice(newPrice);
         setXp(newXP);
+    };
+
+    // ⏰ Soat formatlash funksiyasi
+    const formatTime = (h, m) => {
+        return `${h}h ${m}m`;
     };
 
     // To'lovni amalga oshirish
@@ -92,7 +95,7 @@ const DamOlishPage = () => {
             id: selectedTask.id,
             type: selectedTask.type,
             image: selectedTask.image,
-            hours: totalHours,
+            hours: formatTime(hours, minutes), // ✅ endi "1h 20m" formatida saqlanadi
             price: price,
             xp: xp,
             date: new Date().toLocaleDateString(),
@@ -100,10 +103,6 @@ const DamOlishPage = () => {
         };
 
         try {
-            // 1️⃣ DAM_API dan o'chirish
-            await fetch(`${DAM_API}/${selectedTask.id}`, { method: "DELETE" });
-
-            // 2️⃣ DAM_TRIX_API ga qo'shish
             await fetch(DAM_TRIX_API, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -168,7 +167,7 @@ const DamOlishPage = () => {
                                 <div key={index} className="bg-gray-900/80 rounded-2xl p-4 flex justify-between items-center">
                                     <div>
                                         <h4 className="font-semibold">{task.type}</h4>
-                                        <p className="text-gray-400 text-sm">{task.date || "—"} / {task.time || "—"}</p>
+                                        <p className="text-gray-400 text-sm">{task.date || "—"} / {task.hours || "—"}</p>
                                     </div>
                                     <div className="flex items-center space-x-2">
                                         <p className="text-yellow-400 font-semibold">{task.xp || 1} XP</p>
