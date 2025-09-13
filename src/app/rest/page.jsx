@@ -63,16 +63,20 @@ const DamOlishPage = () => {
         setSelectedTask(task);
         setHours(1);
         setMinutes(0);
-        setPrice(task.price || 1000);
+        setPrice(2000); // ✅ eng kam narx 2000
         setXp(task.xp || 1);
         setModalOpen(true);
     };
 
-    // Narx va XP ni hisoblash
+    // Narx va XP ni hisoblash (min 2000, max 5000)
     const calculatePriceXP = (totalHours) => {
-        const basePrice = selectedTask.price || 1000;
         const baseXP = selectedTask.xp || 1;
-        const newPrice = Math.round(basePrice * totalHours);
+        let newPrice = Math.round((2000 / MAX_HOURS) * totalHours * MAX_HOURS);
+
+        // ✅ Min va Max cheklash
+        if (newPrice < 2000) newPrice = 2000;
+        if (newPrice > 5000) newPrice = 5000;
+
         const newXP = Math.round(baseXP * totalHours);
 
         setPrice(newPrice);
@@ -95,7 +99,7 @@ const DamOlishPage = () => {
             id: selectedTask.id,
             type: selectedTask.type,
             image: selectedTask.image,
-            hours: formatTime(hours, minutes), // ✅ endi "1h 20m" formatida saqlanadi
+            hours: formatTime(hours, minutes),
             price: price,
             xp: xp,
             date: new Date().toLocaleDateString(),
@@ -148,7 +152,7 @@ const DamOlishPage = () => {
                             <div>
                                 <h3 className="text-lg font-semibold">{task.type}</h3>
                                 <p className="text-gray-300 text-sm">
-                                    Narx: {task.price || 1000} so‘m / XP: {task.xp || 1}
+                                    Narx: {task.price || 2000} so‘m / XP: {task.xp || 1}
                                 </p>
                             </div>
                             <img src={task.image} alt={task.type} className="w-20 h-20 object-cover rounded-2xl shadow-lg" />
