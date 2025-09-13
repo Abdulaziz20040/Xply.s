@@ -420,7 +420,7 @@ const TasksPage = () => {
 
             {/* Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end">
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end pb-25">
                     <div className="w-full bg-gray-900 rounded-t-3xl p-6 max-h-[80vh] overflow-y-auto relative">
                         <div className="flex items-center justify-between mb-6">
                             <h3 className="text-xl font-bold text-white">
