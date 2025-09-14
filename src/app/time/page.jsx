@@ -1,11 +1,22 @@
 "use client";
+
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 import { ArrowLeft, RotateCcw } from "lucide-react";
 
 const DONE_API = "https://59159b0f4ee6c5cb.mokky.dev/Ishlar";
 
+// 🔹 Asosiy sahifa Suspense bilan
 export default function TimePage() {
+    return (
+        <Suspense fallback={<div className="text-center p-6">Yuklanmoqda...</div>}>
+            <TimePageContent />
+        </Suspense>
+    );
+}
+
+// 🔹 Asl kodni shu yerga olib keldik
+function TimePageContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const taskId = searchParams.get("id");
@@ -59,13 +70,15 @@ export default function TimePage() {
             );
         }
         return () => clearInterval(interval);
-    }, [running]);
+    }, [running, seconds]);
 
     const formatTime = (sec) => {
         const h = Math.floor(sec / 3600);
         const m = Math.floor((sec % 3600) / 60);
         const s = sec % 60;
-        return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+        return `${h}:${m.toString().padStart(2, "0")}:${s
+            .toString()
+            .padStart(2, "0")}`;
     };
 
     // 🪙 Har 2 minutga 1 XP
