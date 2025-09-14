@@ -11,7 +11,6 @@ import {
     Clock,
     Calendar,
     Pause,
-    Square
 } from "lucide-react";
 
 const TasksPage = () => {
@@ -20,21 +19,22 @@ const TasksPage = () => {
 
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [tab, setTab] = useState("kundalik"); // "kundalik" yoki "rejalashtirilgan"ot
+    const [tab, setTab] = useState("kundalik");
     const [showModal, setShowModal] = useState(false);
     const [modalType, setModalType] = useState("add");
 
-    // Kundalik ishlar uchun
+    // Kundalik ishlar
     const [newDailyTask, setNewDailyTask] = useState({
         name: "",
         days: [],
         time: ""
     });
 
-    // Rejalashtirilgan ishlar uchun
+    // Rejalashtirilgan ishlar
     const [newScheduledTask, setNewScheduledTask] = useState({
         name: "",
-        date: ""
+        date: "",
+        difficulty: ""
     });
 
     const [openMenuId, setOpenMenuId] = useState(null);
@@ -98,13 +98,14 @@ const TasksPage = () => {
 
     // Rejalashtirilgan ish qo'shish
     const handleAddScheduledTask = async () => {
-        if (!newScheduledTask.name || !newScheduledTask.date) return;
+        if (!newScheduledTask.name || !newScheduledTask.difficulty) return;
 
         const task = {
             name: newScheduledTask.name,
-            date: newScheduledTask.date,
             completed: false,
-            createdDate: new Date().toISOString().split("T")[0]
+            createdDate: new Date().toISOString().split("T")[0],
+            date: newScheduledTask.date,
+            difficulty: newScheduledTask.difficulty
         };
 
         try {
@@ -114,7 +115,7 @@ const TasksPage = () => {
                 body: JSON.stringify(task)
             });
             fetchTasks();
-            setNewScheduledTask({ name: "", date: "" });
+            setNewScheduledTask({ name: "", date: "", difficulty: "" });
             setShowModal(false);
         } catch (error) {
             console.error("Rejalashtirilgan ish qo'shishda xatolik:", error);
@@ -124,9 +125,7 @@ const TasksPage = () => {
     // Rejalashtirilgan ishni bajarilgan deb belgilash
     const handleCompleteScheduledTask = async (taskId) => {
         try {
-            await fetch(`${SCHEDULED_TASKS_API}/${taskId}`, {
-                method: "DELETE"
-            });
+            await fetch(`${SCHEDULED_TASKS_API}/${taskId}`, { method: "DELETE" });
             setTasks(tasks.filter(t => t.id !== taskId));
         } catch (error) {
             console.error("Ishni bajarishda xatolik:", error);
@@ -145,13 +144,13 @@ const TasksPage = () => {
         }
     };
 
-    // Kun nomini olish
+    // Kun nomi
     const getDayName = (dayKey) => {
         const day = weekDays.find(d => d.key === dayKey);
         return day ? day.label : dayKey;
     };
 
-    // Kunni tanlash/bekor qilish
+    // Kun toggle
     const toggleDay = (dayKey) => {
         const updatedDays = newDailyTask.days.includes(dayKey)
             ? newDailyTask.days.filter(d => d !== dayKey)
@@ -164,32 +163,22 @@ const TasksPage = () => {
         const endTime = Date.now() + (timeInMinutes * 60 * 1000);
         setRunningTasks(new Map(runningTasks.set(taskId, { endTime, timeInMinutes })));
 
-        // Timer
-        const timer = setTimeout(() => {
+        setTimeout(() => {
             setRunningTasks(prev => {
                 const newMap = new Map(prev);
                 newMap.delete(taskId);
                 return newMap;
             });
 
-            // Bildirishnoma
             setNotifications(prev => [...prev, {
                 id: Date.now(),
-                message: `"${tasks.find(t => t.id === taskId)?.name}" ishi tugadi!`,
+                message: `"${tasks.find(t => t.id === taskId)?.name}" tugadi!`,
                 time: new Date().toLocaleTimeString()
             }]);
-
-            // 5 soniyadan keyin bildirishnomani o'chirish
-            setTimeout(() => {
-                setNotifications(prev => prev.filter(n => n.id !== Date.now()));
-            }, 5000);
-
         }, timeInMinutes * 60 * 1000);
-
-        return timer;
     };
 
-    // Vaqtni to'xtatish
+    // To'xtatish
     const stopTask = (taskId) => {
         setRunningTasks(prev => {
             const newMap = new Map(prev);
@@ -198,19 +187,17 @@ const TasksPage = () => {
         });
     };
 
-    // Vaqtni formatlash
+    // Time format
     const formatTime = (timeStr) => {
         if (!timeStr) return "";
         return timeStr;
     };
 
-    // Vaqt konvertatsiyasi (HH:MM -> minutes)
     const timeToMinutes = (timeStr) => {
         const [hours, minutes] = timeStr.split(':').map(Number);
         return hours * 60 + minutes;
     };
 
-    // Qolgan vaqtni hisoblash
     const getRemainingTime = (taskId) => {
         const taskInfo = runningTasks.get(taskId);
         if (!taskInfo) return null;
@@ -222,64 +209,66 @@ const TasksPage = () => {
         return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     };
 
-    // Har soniyada qolgan vaqtni yangilash
     useEffect(() => {
         const interval = setInterval(() => {
             setRunningTasks(prev => new Map(prev));
         }, 1000);
-
         return () => clearInterval(interval);
     }, []);
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white pb-20 relative">
+        <div className="min-h-screen bg-gradient-to-b from-[#0a0f1f] to-[#1a1f3c] text-white pb-20 relative">
             {/* Bildirishnomalar */}
             {notifications.map(notification => (
-                <div key={notification.id} className="fixed top-4 right-4 bg-green-500 text-white p-4 rounded-xl shadow-lg z-50 animate-pulse">
-                    <div className="font-semibold">{notification.message}</div>
-                    <div className="text-sm opacity-80">{notification.time}</div>
+                <div key={notification.id} className="fixed top-4 right-4 bg-green-600 text-white p-4 rounded-xl shadow-lg z-50 animate-bounce">
+                    <div className="font-bold tracking-wide">{notification.message}</div>
+                    <div className="text-xs opacity-80">{notification.time}</div>
                 </div>
             ))}
 
             {loading && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-md z-50">
-                    <Loader2 className="animate-spin text-blue-500" size={48} />
+                <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-md z-50">
+                    <Loader2 className="animate-spin text-purple-400" size={48} />
                 </div>
             )}
 
             {/* Header */}
-            <div className="sticky top-0 bg-gray-900/80 backdrop-blur-xl border-b border-gray-800 z-40">
+            <div className="sticky top-0 bg-black/40 backdrop-blur-lg border-b border-purple-800 z-40">
                 <div className="flex items-center justify-between p-6">
                     <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-                            <CheckSquare size={20} className="text-white" />
+                        <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/50">
+                            <CheckSquare size={22} className="text-white" />
                         </div>
-                        <h1 className="text-xl font-bold">Ishlar</h1>
+                        <h1 className="text-2xl font-extrabold tracking-wider">🎮 Questlar</h1>
                     </div>
                     <button
                         onClick={() => {
                             setModalType("add");
                             setShowModal(true);
                         }}
-                        className="bg-gradient-to-r from-blue-500 to-blue-600 p-3 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-blue-500/25"
+                        className="bg-gradient-to-r from-purple-500 to-pink-600 p-3 rounded-2xl hover:scale-110 transition-transform shadow-lg shadow-purple-500/30"
                     >
-                        <Plus size={20} />
+                        <Plus size={22} />
                     </button>
                 </div>
 
                 {/* Tabs */}
-                <div className="flex justify-center space-x-4 border-t border-gray-800 bg-gray-900/90">
+                <div className="flex justify-center space-x-4 border-t border-purple-900 bg-black/50">
                     <button
-                        className={`flex-1 py-3 ${tab === "kundalik" ? "border-b-2 border-blue-500 text-blue-400" : "text-gray-400"}`}
+                        className={`flex-1 py-3 font-semibold tracking-wide ${tab === "kundalik"
+                            ? "border-b-2 border-pink-500 text-pink-400"
+                            : "text-gray-400 hover:text-gray-200"}`}
                         onClick={() => setTab("kundalik")}
                     >
-                        Kundalik ishlar
+                        🗓️ Kundalik
                     </button>
                     <button
-                        className={`flex-1 py-3 ${tab === "rejalashtirilgan" ? "border-b-2 border-green-500 text-green-400" : "text-gray-400"}`}
+                        className={`flex-1 py-3 font-semibold tracking-wide ${tab === "rejalashtirilgan"
+                            ? "border-b-2 border-green-500 text-green-400"
+                            : "text-gray-400 hover:text-gray-200"}`}
                         onClick={() => setTab("rejalashtirilgan")}
                     >
-                        Rejalashtirilgan
+                        📌 Rejalashtirilgan
                     </button>
                 </div>
             </div>
@@ -287,43 +276,41 @@ const TasksPage = () => {
             {/* Tasks List */}
             <div className="px-6 mt-4 space-y-3">
                 {tasks.length === 0 ? (
-                    <div className="text-center py-12">
-                        <div className="text-6xl mb-4">📝</div>
-                        <h3 className="text-xl font-semibold text-gray-300 mb-2">Ish topilmadi</h3>
+                    <div className="text-center py-12 opacity-80">
+                        <div className="text-6xl mb-4">🚀</div>
+                        <h3 className="text-xl font-semibold text-gray-300 mb-2">Hech narsa yo‘q</h3>
                         <p className="text-gray-400">
-                            {tab === "kundalik" ? "Kundalik ishlar ro'yxati bo'sh" : "Rejalashtirilgan ishlar yo'q"}
+                            {tab === "kundalik" ? "Bugun senga vazifalar berilmagan" : "Rejalashtirilgan vazifalar yo‘q"}
                         </p>
                     </div>
                 ) : (
                     tasks.map((task) => (
                         <div key={task.id} className="relative">
-                            <div className="bg-gray-800/50 rounded-2xl p-4 hover:bg-gray-800/70 transition-colors">
+                            <div className="bg-[#151530]/80 rounded-2xl p-4 hover:bg-[#1e1e3c] transition-all shadow-md shadow-purple-900/40">
                                 <div className="flex items-center justify-between">
                                     <div className="flex-1">
-                                        {/* Rejalashtirilgan ishlar uchun checkbox */}
                                         {tab === "rejalashtirilgan" && (
                                             <div className="flex items-center space-x-3 mb-2">
                                                 <button
                                                     onClick={() => handleCompleteScheduledTask(task.id)}
-                                                    className="w-6 h-6 border-2 border-green-400 rounded-md hover:bg-green-400 transition-colors flex items-center justify-center"
+                                                    className="w-7 h-7 border-2 border-green-400 rounded-md hover:bg-green-500 flex items-center justify-center transition-colors"
                                                 >
-                                                    <CheckSquare size={16} className="text-green-400" />
+                                                    <CheckSquare size={16} className="text-green-300" />
                                                 </button>
                                             </div>
                                         )}
 
-                                        <h4 className="font-medium text-white mb-1">{task.name}</h4>
+                                        <h4 className="font-bold text-lg text-white mb-1">{task.name}</h4>
 
-                                        {/* Kundalik ishlar ma'lumotlari */}
                                         {tab === "kundalik" && (
                                             <div className="flex items-center space-x-4 text-sm text-gray-400">
                                                 <div className="flex items-center space-x-1">
-                                                    <Clock size={14} />
+                                                    <Clock size={14} className="text-pink-400" />
                                                     <span>{formatTime(task.time)}</span>
                                                 </div>
                                                 <div className="flex flex-wrap gap-1">
                                                     {task.days?.map(day => (
-                                                        <span key={day} className="px-2 py-1 bg-blue-500/30 text-blue-400 rounded-lg text-xs">
+                                                        <span key={day} className="px-2 py-1 bg-purple-600/30 text-purple-300 rounded-lg text-xs">
                                                             {getDayName(day)}
                                                         </span>
                                                     ))}
@@ -331,48 +318,42 @@ const TasksPage = () => {
                                             </div>
                                         )}
 
-                                        {/* Rejalashtirilgan ishlar ma'lumotlari */}
                                         {tab === "rejalashtirilgan" && (
                                             <div className="flex items-center space-x-2 text-sm text-gray-400">
-                                                <Calendar size={14} />
-                                                <span>{task.date}</span>
+                                                <Calendar size={14} className="text-green-400" />
+                                                <span>{task.date || "Sana belgilanmagan"}</span>
                                             </div>
                                         )}
 
-                                        {/* Ishlamoqda ko'rsatkichi */}
                                         {runningTasks.has(task.id) && (
                                             <div className="mt-2 flex items-center space-x-2 text-green-400">
-                                                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                                                <span className="text-sm">
-                                                    Qolgan vaqt: {getRemainingTime(task.id)}
+                                                <div className="w-2 h-2 bg-green-400 rounded-full animate-ping"></div>
+                                                <span className="text-sm font-semibold">
+                                                    ⏳ {getRemainingTime(task.id)}
                                                 </span>
                                             </div>
                                         )}
                                     </div>
 
                                     <div className="flex items-center space-x-2">
-                                        {/* Kundalik ishlar uchun boshqaruv tugmalari */}
                                         {tab === "kundalik" && (
-                                            <>
-                                                <button
-                                                    onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
-                                                    className="p-2 bg-blue-500/20 text-blue-400 rounded-xl hover:bg-blue-500/30 transition-colors"
-                                                >
-                                                    <Play size={16} />
-                                                </button>
-                                            </>
+                                            <button
+                                                onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
+                                                className="p-2 bg-purple-600/20 text-purple-400 rounded-xl hover:bg-purple-600/40 transition-colors"
+                                            >
+                                                <Play size={16} />
+                                            </button>
                                         )}
 
                                         <button
                                             onClick={() => setOpenMenuId(openMenuId === task.id ? null : task.id)}
-                                            className="p-2 rounded-xl hover:bg-gray-700"
+                                            className="p-2 rounded-xl hover:bg-gray-700/50"
                                         >
                                             <MoreVertical size={20} className="text-gray-300" />
                                         </button>
                                     </div>
                                 </div>
 
-                                {/* Kengaytirilgan kundalik ish boshqaruvi */}
                                 {tab === "kundalik" && expandedTaskId === task.id && (
                                     <div className="mt-4 pt-4 border-t border-gray-700">
                                         <div className="flex space-x-3">
@@ -382,33 +363,32 @@ const TasksPage = () => {
                                                         const minutes = timeToMinutes(task.time);
                                                         startTask(task.id, minutes);
                                                     }}
-                                                    className="flex items-center space-x-2 px-4 py-2 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors"
+                                                    className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors"
                                                 >
                                                     <Play size={16} />
-                                                    <span>Boshlash</span>
+                                                    <span>Start</span>
                                                 </button>
                                             ) : (
                                                 <button
                                                     onClick={() => stopTask(task.id)}
-                                                    className="flex items-center space-x-2 px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors"
+                                                    className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors"
                                                 >
                                                     <Pause size={16} />
-                                                    <span>To'xtatish</span>
+                                                    <span>Stop</span>
                                                 </button>
                                             )}
                                         </div>
                                     </div>
                                 )}
 
-                                {/* Dropdown menyu */}
                                 {openMenuId === task.id && (
-                                    <div className="absolute right-4 bottom-full mb-2 bg-gray-900 border border-gray-700 rounded-xl shadow-lg w-40 z-50">
+                                    <div className="absolute right-4 bottom-full mb-2 bg-black/80 border border-gray-700 rounded-xl shadow-lg w-40 z-50">
                                         <button
                                             onClick={() => handleDeleteTask(task.id)}
-                                            className="flex items-center space-x-2 w-full px-4 py-2 text-red-500 hover:bg-gray-800 rounded-xl"
+                                            className="flex items-center space-x-2 w-full px-4 py-2 text-red-400 hover:bg-red-600/20 rounded-xl"
                                         >
                                             <Trash2 size={16} />
-                                            <span>O'chirish</span>
+                                            <span>O‘chirish</span>
                                         </button>
                                     </div>
                                 )}
@@ -420,17 +400,17 @@ const TasksPage = () => {
 
             {/* Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end pb-25">
-                    <div className="w-full bg-gray-900 rounded-t-3xl p-6 max-h-[80vh] overflow-y-auto relative">
+                <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-end pb-22">
+                    <div className="w-full bg-[#12122b] rounded-t-3xl p-6 max-h-[80vh] overflow-y-auto relative border-t-2 border-purple-600 shadow-2xl">
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-bold text-white">
-                                {tab === "kundalik" ? "Kundalik ish qo'shish" : "Rejalashtirilgan ish qo'shish"}
+                            <h3 className="text-xl font-bold text-purple-300">
+                                {tab === "kundalik" ? "➕ Kundalik vazifa" : "➕ Rejalashtirilgan vazifa"}
                             </h3>
                             <button
                                 onClick={() => {
                                     setShowModal(false);
                                     setNewDailyTask({ name: "", days: [], time: "" });
-                                    setNewScheduledTask({ name: "", date: "" });
+                                    setNewScheduledTask({ name: "", date: "", difficulty: "" });
                                 }}
                                 className="p-2 bg-gray-800 rounded-xl hover:bg-gray-700 transition-colors"
                             >
@@ -438,30 +418,28 @@ const TasksPage = () => {
                             </button>
                         </div>
 
-                        {/* Kundalik ish qo'shish modali */}
+                        {/* Kundalik */}
                         {tab === "kundalik" && (
                             <div className="space-y-4">
                                 <input
                                     type="text"
-                                    placeholder="Ish nomi"
+                                    placeholder="Vazifa nomi"
                                     value={newDailyTask.name}
                                     onChange={(e) => setNewDailyTask({ ...newDailyTask, name: e.target.value })}
-                                    className="w-full p-3 bg-gray-800 rounded-xl text-white placeholder-gray-400"
+                                    className="w-full p-3 bg-gray-800 rounded-xl text-white placeholder-gray-500 border border-purple-500/30"
                                 />
 
-                                {/* Kunlarni tanlash */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        Kunlar
-                                    </label>
+                                    <label className="block text-sm font-medium text-purple-300 mb-2">Kunlar</label>
                                     <div className="grid grid-cols-2 gap-2">
                                         {weekDays.map(day => (
+
                                             <button
                                                 key={day.key}
                                                 onClick={() => toggleDay(day.key)}
-                                                className={`p-3 rounded-xl transition-colors ${newDailyTask.days.includes(day.key)
-                                                    ? "bg-blue-500 text-white"
-                                                    : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                                                className={`p-2 rounded-xl text-sm font-semibold transition-all ${newDailyTask.days.includes(day.key)
+                                                    ? "bg-purple-600 text-white shadow-md shadow-purple-500/30"
+                                                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                                                     }`}
                                             >
                                                 {day.label}
@@ -470,15 +448,16 @@ const TasksPage = () => {
                                     </div>
                                 </div>
 
-                                {/* Vaqt tanlash */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        Vaqt (soat:daqiqa)
+                                    <label className="block text-sm font-medium text-purple-300 mb-2">
+                                        Vaqt
                                     </label>
                                     <input
                                         type="time"
                                         value={newDailyTask.time}
-                                        onChange={(e) => setNewDailyTask({ ...newDailyTask, time: e.target.value })}
+                                        onChange={(e) =>
+                                            setNewDailyTask({ ...newDailyTask, time: e.target.value })
+                                        }
                                         className="w-full p-3 bg-gray-800 rounded-xl text-white"
                                     />
                                 </div>
@@ -486,9 +465,9 @@ const TasksPage = () => {
                                 <button
                                     onClick={handleAddDailyTask}
                                     disabled={!newDailyTask.name || !newDailyTask.time || newDailyTask.days.length === 0}
-                                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 p-4 rounded-xl font-semibold text-white hover:from-blue-600 hover:to-blue-700 transition-all duration-300 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed"
+                                    className="w-full bg-gradient-to-r from-purple-500 to-pink-600 p-4 rounded-xl font-bold text-white hover:scale-105 transition-transform disabled:opacity-50"
                                 >
-                                    Kundalik ish qo'shish
+                                    Vazifa qo‘shish
                                 </button>
                             </div>
                         )}
@@ -507,7 +486,7 @@ const TasksPage = () => {
                                 {/* Sana tanlash */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        Sana
+                                        Sana (ixtiyoriy)
                                     </label>
                                     <input
                                         type="date"
@@ -518,9 +497,46 @@ const TasksPage = () => {
                                     />
                                 </div>
 
+
+                                {/* Qiyinlik darajasi tanlash 🔥 */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        Qiyinlik darajasi
+                                    </label>
+                                    <div className="flex space-x-3">
+                                        <button
+                                            onClick={() => setNewScheduledTask({ ...newScheduledTask, difficulty: "easy" })}
+                                            className={`flex-1 py-2 rounded-xl font-semibold transition-colors ${newScheduledTask.difficulty === "easy"
+                                                ? "bg-blue-500 text-white"
+                                                : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                                                }`}
+                                        >
+                                            Oson
+                                        </button>
+                                        <button
+                                            onClick={() => setNewScheduledTask({ ...newScheduledTask, difficulty: "medium" })}
+                                            className={`flex-1 py-2 rounded-xl font-semibold transition-colors ${newScheduledTask.difficulty === "medium"
+                                                ? "bg-yellow-500 text-white"
+                                                : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                                                }`}
+                                        >
+                                            O‘rtacha
+                                        </button>
+                                        <button
+                                            onClick={() => setNewScheduledTask({ ...newScheduledTask, difficulty: "hard" })}
+                                            className={`flex-1 py-2 rounded-xl font-semibold transition-colors ${newScheduledTask.difficulty === "hard"
+                                                ? "bg-red-500 text-white"
+                                                : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                                                }`}
+                                        >
+                                            Qiyin
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <button
                                     onClick={handleAddScheduledTask}
-                                    disabled={!newScheduledTask.name || !newScheduledTask.date}
+                                    disabled={!newScheduledTask.name || !newScheduledTask.difficulty}
                                     className="w-full bg-gradient-to-r from-green-500 to-green-600 p-4 rounded-xl font-semibold text-white hover:from-green-600 hover:to-green-700 transition-all duration-300 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed"
                                 >
                                     Rejalashtirilgan ish qo'shish

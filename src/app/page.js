@@ -97,17 +97,27 @@ const MobileHomePage = () => {
         streak: statusData.streak || 0,
         lastLogin: statusData.lastLogin || null,
       };
-
+      // Sana faqat "kun" bo‘yicha solishtiriladi
       const today = new Date();
-      const lastLoginDate = updatedHero.lastLogin ? new Date(updatedHero.lastLogin) : null;
+      today.setHours(0, 0, 0, 0);
 
-      // Bugungi streak
-      const todayCopy = new Date(today);
-      todayCopy.setHours(0, 0, 0, 0);
-      if (!lastLoginDate || new Date(lastLoginDate).setHours(0, 0, 0, 0) < todayCopy.getTime()) {
-        updatedHero.streak += 1;
-        updatedHero.lastLogin = today.toISOString();
+      let lastLoginDate = null;
+      if (updatedHero.lastLogin) {
+        lastLoginDate = new Date(updatedHero.lastLogin);
+        lastLoginDate.setHours(0, 0, 0, 0);
       }
+
+      if (!lastLoginDate) {
+        // Birinchi marta kirish
+        updatedHero.streak = 1;
+        updatedHero.lastLogin = new Date().toISOString();
+      } else if (lastLoginDate.getTime() < today.getTime()) {
+        // Oxirgi login kuni bugundan kichik bo‘lsa +1
+        updatedHero.streak += 1;
+        updatedHero.lastLogin = new Date().toISOString();
+      }
+      // Agar lastLogin == today bo‘lsa hech narsa qilinmaydi (streak o‘zgarishsiz qoladi)
+
 
       let totalXP = 0;
       let totalGold = 0;
