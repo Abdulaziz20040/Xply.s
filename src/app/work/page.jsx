@@ -13,36 +13,65 @@ const WorkPage = () => {
     const [loading, setLoading] = useState(true);
     const [totalXP, setTotalXP] = useState(0);
 
-    // XP qiyinlikka qarab
     const calculateXP = (task) => {
+        if (typeof task.xp === "number") return task.xp;
         if (task.difficulty === "easy") return 5;
         if (task.difficulty === "medium") return 10;
         if (task.difficulty === "hard") return 20;
-        return 5; // default
+        return 5;
+    };
+
+    const getTaskDate = (task) => {
+        if (!task) return null;
+        if (task.completedDate) {
+            // ✅ Agar completedDate faqat sana bo‘lsa uni qaytar, aks holda T bo‘yicha ajrat
+            return task.completedDate.includes("T")
+                ? task.completedDate.split("T")[0]
+                : task.completedDate;
+        }
+        if (task.date) return task.date;
+        if (task.createdDate) {
+            return task.createdDate.includes("T")
+                ? task.createdDate.split("T")[0]
+                : task.createdDate;
+        }
+        return null;
+    };
+
+    const getTaskTime = (task) => {
+        if (!task) return "";
+        if (task.time) return task.time;
+        if (task.completedDate && task.completedDate.includes("T")) {
+            return task.completedDate.split("T")[1]?.split(".")[0] || "";
+        }
+        return "";
     };
 
     const fetchTasks = async () => {
         setLoading(true);
         try {
-            const [tasksRes, doneRes] = await Promise.all([fetch(TASKS_API), fetch(DONE_API)]);
-            const tasksData = await tasksRes.json();
-            const doneData = await doneRes.json();
+            const [tasksRes, doneRes] = await Promise.all([
+                fetch(TASKS_API),
+                fetch(DONE_API),
+            ]);
 
-            const doneWithXP = doneData.map(task => {
-                return {
-                    ...task,
-                    xp: task.xp !== undefined ? task.xp : calculateXP(task),
-                };
-            });
+            const tasksData = tasksRes.ok ? await tasksRes.json() : [];
+            const doneDataRaw = doneRes.ok ? await doneRes.json() : [];
 
-            setTasks(tasksData.map(task => ({ ...task, completed: false })));
+            const doneWithXP = doneDataRaw.map((task) => ({
+                ...task,
+                xp: task.xp !== undefined ? task.xp : calculateXP(task),
+            }));
+
+            // Eng yangi tepada bo‘lsin
+            doneWithXP.sort(
+                (a, b) =>
+                    new Date(getTaskDate(b) || 0) -
+                    new Date(getTaskDate(a) || 0)
+            );
+
+            setTasks(tasksData.map((task) => ({ ...task, completed: false })));
             setDoneTasks(doneWithXP);
-
-            const total = doneWithXP.reduce((sum, task) => sum + task.xp, 0);
-            setTotalXP(total);
-
-            // 🔴 Minus XP tekshirish
-            checkDailyPenalty(doneWithXP);
         } catch (error) {
             console.error("Xatolik:", error);
         } finally {
@@ -50,39 +79,14 @@ const WorkPage = () => {
         }
     };
 
-    // Kunlik jarima funksiyasi
-    const checkDailyPenalty = async (doneWithXP) => {
+    // ✅ XP ni doneTasks o‘zgarganda hisoblash
+    useEffect(() => {
         const today = new Date().toISOString().split("T")[0];
-
-        // Bugungi bajarilgan ishlar
-        const todayTasks = doneWithXP.filter(
-            task => task.completedDate && task.completedDate.split("T")[0] === today
-        );
-
-        if (todayTasks.length < 2 && todayTasks.length > 0) {
-            const penaltyXP = todayTasks.reduce((sum, task) => sum + task.xp, 0);
-
-            const penaltyTask = {
-                id: `penalty-${today}`,
-                name: "Kunlik reja bajarilmadi ❌",
-                xp: -penaltyXP,
-                completedDate: new Date().toISOString(),
-            };
-
-            try {
-                await fetch(DONE_API, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(penaltyTask),
-                });
-
-                setDoneTasks(prev => [...prev, penaltyTask]);
-                setTotalXP(prev => prev - penaltyXP);
-            } catch (error) {
-                console.error("Jarima yozishda xatolik:", error);
-            }
-        }
-    };
+        const todaysXP = doneTasks
+            .filter((t) => getTaskDate(t) === today)
+            .reduce((sum, t) => sum + calculateXP(t), 0);
+        setTotalXP(todaysXP);
+    }, [doneTasks]);
 
     useEffect(() => {
         fetchTasks();
@@ -94,29 +98,37 @@ const WorkPage = () => {
             ...task,
             completed: true,
             xp,
-            completedDate: new Date().toISOString()
+            completedDate: new Date().toISOString(),
         };
 
         try {
             await fetch(`${TASKS_API}/${task.id}`, { method: "DELETE" });
-            await fetch(DONE_API, {
+
+            const res = await fetch(DONE_API, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(completedTask)
+                body: JSON.stringify(completedTask),
             });
 
-            setTasks(prev => prev.filter(t => t.id !== task.id));
-            setDoneTasks(prev => [...prev, completedTask]);
-            setTotalXP(prev => prev + xp);
+            if (!res.ok) console.error("DONE API xato:", res.status);
+
+            setTasks((prev) => prev.filter((t) => t.id !== task.id));
+            setDoneTasks((prev) => [completedTask, ...prev]);
         } catch (error) {
-            console.error("API bilan ishlashda xatolik:", error);
+            console.error("API bilan xatolik:", error);
         }
     };
 
-    const completedCount = doneTasks.length;
-    const minTasks = 2;
+    const today = new Date().toISOString().split("T")[0];
+    const todayTasks = doneTasks.filter((t) => getTaskDate(t) === today);
+    const completedTodayCount = todayTasks.length;
+    const totalTodayCount = Math.max(tasks.length + todayTasks.length, 2);
+    const progressPercent = Math.round(
+        (completedTodayCount / totalTodayCount) * 100
+    );
 
-    if (loading) return <div className="text-white p-6">Yuklanmoqda...</div>;
+    if (loading)
+        return <div className="text-white p-6">Yuklanmoqda...</div>;
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white pb-20">
@@ -134,15 +146,17 @@ const WorkPage = () => {
                     <div className="flex justify-between items-center">
                         <div>
                             <h2 className="text-3xl font-bold text-white flex items-center">
-                                <Trophy className="mr-2 text-yellow-400" /> {totalXP} XP
+                                <Trophy className="mr-2 text-yellow-400" />{" "}
+                                {totalXP} XP
                             </h2>
                             <p className="text-purple-200">
-                                Bajarilgan ishlar: {completedCount}/{Math.max(tasks.length + doneTasks.length, minTasks)}
+                                Bugungi ishlar: {completedTodayCount}/
+                                {totalTodayCount}
                             </p>
                         </div>
                         <div className="text-right">
                             <div className="text-2xl font-bold text-white">
-                                {Math.round((completedCount / Math.max(tasks.length + doneTasks.length, minTasks)) * 100)}%
+                                {progressPercent}%
                             </div>
                             <p className="text-purple-200 text-sm">Bajarildi</p>
                         </div>
@@ -151,25 +165,34 @@ const WorkPage = () => {
                     <div className="mt-4 bg-purple-800/30 rounded-full h-3">
                         <div
                             className="bg-gradient-to-r from-yellow-400 to-green-400 h-3 rounded-full transition-all duration-500"
-                            style={{ width: `${(completedCount / Math.max(tasks.length + doneTasks.length, minTasks)) * 100}%` }}
+                            style={{ width: `${progressPercent}%` }}
                         ></div>
                     </div>
                 </div>
-
-                {/* Barcha ishlar */}
+                {/* Ishlar ro‘yxati */}
                 <div className="space-y-3">
                     <h3 className="text-xl font-bold mb-4 flex items-center">
                         <Calendar className="mr-2" size={24} /> Ishlar Ro'yxati
                     </h3>
-                    {tasks.map(task => (
+                    {tasks.map((task) => (
                         <div
                             key={task.id}
-                            onClick={() => router.push(`/time?id=${task.id}&name=${encodeURIComponent(task.name)}`)}
+                            onClick={() =>
+                                router.push(
+                                    `/time?id=${task.id}&name=${encodeURIComponent(
+                                        task.name
+                                    )}`
+                                )
+                            }
                             className="cursor-pointer bg-gradient-to-br from-gray-800 via-gray-700 to-gray-900/90 rounded-2xl p-4 flex justify-between items-center border border-gray-700/50 hover:scale-105 transition transform duration-300"
                         >
                             <div>
-                                <h4 className="font-semibold text-white">{task.name}</h4>
-                                <p className="text-gray-400">{calculateXP(task)} XP</p>
+                                <h4 className="font-semibold text-white">
+                                    {task.name}
+                                </h4>
+                                <p className="text-gray-400">
+                                    {calculateXP(task)} XP
+                                </p>
                             </div>
                             <button
                                 onClick={(e) => {
@@ -178,35 +201,55 @@ const WorkPage = () => {
                                 }}
                                 className="p-3 rounded-xl bg-blue-500 hover:bg-blue-600 transition-all duration-300"
                             >
-                                <CheckCircle2 size={24} className="text-white" />
+                                <CheckCircle2
+                                    size={24}
+                                    className="text-white"
+                                />
                             </button>
                         </div>
                     ))}
                 </div>
 
-                {/* Bajarilgan ishlar tarixi */}
+                {/* Bajarilgan ishlar */}
                 <div className="mt-12">
-                    <h3 className="text-lg font-semibold mb-4">Bajarilgan ishlar tarixi</h3>
+                    <h3 className="text-lg font-semibold mb-4">
+                        Bajarilgan ishlar tarixi
+                    </h3>
                     {doneTasks.length === 0 ? (
                         <div className="text-center py-12">
                             <div className="text-6xl mb-4">📋</div>
-                            <h3 className="text-xl font-semibold text-gray-300 mb-2">Tarix topilmadi</h3>
+                            <h3 className="text-xl font-semibold text-gray-300 mb-2">
+                                Tarix topilmadi
+                            </h3>
                             <p className="text-gray-400">Hali ish bajarilmadi</p>
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {doneTasks.map(task => (
+                            {doneTasks.map((task) => (
                                 <div
                                     key={task.id}
-                                    className={`bg-gradient-to-br ${task.xp < 0 ? "from-red-900 via-red-800 to-red-900" : "from-gray-900 via-gray-800 to-gray-900/90"} rounded-2xl p-4 flex justify-between items-center border border-gray-700/50 hover:scale-105 transition transform duration-300`}
+                                    className={`bg-gradient-to-br ${task.xp < 0
+                                            ? "from-red-900 via-red-800 to-red-900"
+                                            : "from-gray-900 via-gray-800 to-gray-900/90"
+                                        } rounded-2xl p-4 flex justify-between items-center border border-gray-700/50 hover:scale-105 transition transform duration-300`}
                                 >
                                     <div>
-                                        <h4 className="font-semibold text-white">{task.name}</h4>
+                                        <h4 className="font-semibold text-white">
+                                            {task.name}
+                                        </h4>
                                         <p className="text-gray-400 text-sm">
-                                            🗓 {task.completedDate ? task.completedDate.split("T")[0] : ""}
+                                            🗓 {getTaskDate(task) || ""}{" "}
+                                            {getTaskTime(task)
+                                                ? `· ${getTaskTime(task)}`
+                                                : ""}
                                         </p>
                                     </div>
-                                    <div className={`flex items-center font-semibold ${task.xp < 0 ? "text-red-400" : "text-yellow-400"}`}>
+                                    <div
+                                        className={`flex items-center font-semibold ${task.xp < 0
+                                                ? "text-red-400"
+                                                : "text-yellow-400"
+                                            }`}
+                                    >
                                         <Star size={16} className="mr-1" />
                                         {task.xp} XP
                                     </div>

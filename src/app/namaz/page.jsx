@@ -42,13 +42,26 @@ const NamazPage = () => {
 
     useEffect(() => {
         fetchCompletedPrayers();
+
+        // ⏰ Har 1 daqiqada tekshiramiz
+        const interval = setInterval(() => {
+            const now = new Date();
+            const hours = now.getHours();
+            const minutes = now.getMinutes();
+
+            if (hours === 23 && minutes === 0) {
+                checkDailyPenalty();
+            }
+        }, 60000);
+
+        return () => clearInterval(interval);
     }, []);
 
     const markPrayerCompleted = async (prayer) => {
         const today = new Date();
         const completedPrayer = {
             title: prayer.name,
-            key: prayer.key, // ✅ id emas, key saqlaymiz
+            key: prayer.key,
             date: today.toISOString().split('T')[0],
             time: today.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }),
             status: 'bajarildi',
@@ -71,7 +84,7 @@ const NamazPage = () => {
     const isPrayerCompletedToday = (prayerKey) => {
         const today = new Date().toISOString().split('T')[0];
         return completedPrayers.some(prayer =>
-            prayer.key === prayerKey && // ✅ key bo‘yicha tekshiramiz
+            prayer.key === prayerKey &&
             prayer.date === today &&
             prayer.status === 'bajarildi'
         );
@@ -102,7 +115,7 @@ const NamazPage = () => {
 
     const filteredPrayers = completedPrayers.filter(prayer => {
         const matchDate = getDateFilter(prayer, filters.dateRange);
-        const matchPrayer = filters.prayer === 'Barchasi' || prayer.key === filters.prayer; // ✅ key bo‘yicha
+        const matchPrayer = filters.prayer === 'Barchasi' || prayer.key === filters.prayer;
         return matchDate && matchPrayer;
     });
 
@@ -110,6 +123,45 @@ const NamazPage = () => {
         const today = new Date().toISOString().split('T')[0];
         return prayer.date === today && prayer.status === 'bajarildi';
     }).length;
+
+    // ✅ Penalty yozish
+    const checkDailyPenalty = async () => {
+        const today = new Date().toISOString().split("T")[0];
+
+        const alreadyPenalty = completedPrayers.some(
+            (p) => p.title === "Kunlik reja bajarilmadi ❌" && p.date === today
+        );
+        if (alreadyPenalty) return;
+
+        const prayedToday = completedPrayers.filter(
+            (p) => p.date === today && p.status === "bajarildi"
+        );
+
+        const missedXP = prayers
+            .filter((prayer) => !prayedToday.some((p) => p.key === prayer.key))
+            .reduce((sum, p) => sum + p.xp, 0);
+
+        if (missedXP > 0) {
+            const penalty = {
+                title: "Kunlik reja bajarilmadi ❌",
+                xp: -missedXP,
+                date: today,
+                status: "penalty"
+            };
+
+            try {
+                await fetch(API_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(penalty)
+                });
+
+                fetchCompletedPrayers();
+            } catch (error) {
+                console.error("Penalty qo'shishda xatolik:", error);
+            }
+        }
+    };
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 text-white pb-20">
@@ -164,7 +216,7 @@ const NamazPage = () => {
 
                     <div className="space-y-3">
                         {prayers.map((prayer) => {
-                            const isCompleted = isPrayerCompletedToday(prayer.key); // ✅ key bilan tekshiramiz
+                            const isCompleted = isPrayerCompletedToday(prayer.key);
                             return (
                                 <div key={prayer.id} className={`bg-gray-800/50 rounded-2xl p-4 transition-all duration-300 ${isCompleted ? 'bg-green-800/30 border border-green-500/50' : 'hover:bg-gray-800/70'}`}>
                                     <div className="flex items-center justify-between">
@@ -217,7 +269,7 @@ const NamazPage = () => {
                 ) : (
                     <div className="space-y-3">
                         {filteredPrayers.map((prayer, index) => {
-                            const prayerInfo = prayers.find(p => p.key === prayer.key); // ✅ key bilan topamiz
+                            const prayerInfo = prayers.find(p => p.key === prayer.key);
 
                             return (
                                 <div key={index} className="bg-gray-800/50 rounded-2xl p-4">
@@ -235,11 +287,11 @@ const NamazPage = () => {
                                             </div>
                                         </div>
                                         <div className="flex items-center space-x-2">
-                                            <div className="flex items-center text-yellow-400 font-semibold">
+                                            <div className={`flex items-center font-semibold ${prayer.xp < 0 ? "text-red-400" : "text-yellow-400"}`}>
                                                 <Star size={16} className="mr-1" />
-                                                +{prayer.xp} XP
+                                                {prayer.xp < 0 ? prayer.xp : `+${prayer.xp}`} XP
                                             </div>
-                                            <CheckCircle2 size={24} className="text-green-500" />
+                                            {prayer.xp > 0 && <CheckCircle2 size={24} className="text-green-500" />}
                                         </div>
                                     </div>
                                 </div>
@@ -279,7 +331,7 @@ const NamazPage = () => {
                                         Barchasi
                                     </button>
                                     {prayers.map((prayer) => (
-                                        <button key={prayer.id} onClick={() => setFilters({ ...filters, prayer: prayer.key })} // ✅ key bilan filterlaymiz
+                                        <button key={prayer.id} onClick={() => setFilters({ ...filters, prayer: prayer.key })}
                                             className={`p-3 rounded-xl text-sm font-medium transition-all ${filters.prayer === prayer.key ? 'bg-blue-500 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}>
                                             {prayer.name}
                                         </button>

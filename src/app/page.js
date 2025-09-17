@@ -28,8 +28,8 @@ const MobileHomePage = () => {
     streak: 1,
     lastLogin: null,
   });
-  const [todayStats, setTodayStats] = useState({ xp: 0, quests: 0 });
-  const [recentQuests, setRecentQuests] = useState([]);
+  const [todayStats, setTodayStats] = useState({ xp: 0, totalXP: 0 });
+  const [allQuests, setAllQuests] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const quickActions = [
@@ -38,8 +38,6 @@ const MobileHomePage = () => {
     { icon: FcMoneyTransfer, label: "Moliya", color: "bg-green-500" },
     { icon: Store, label: "Do'kon", color: "bg-yellow-500" },
   ];
-
-
 
   // XP oshganida level up qiluvchi funksiya
   const checkLevelUp = (currentXP, currentLevel) => {
@@ -54,7 +52,7 @@ const MobileHomePage = () => {
     return { xp, level, xpNeeded };
   };
 
-  // Fisher-Yates shuffle (random 5 quests)
+  // Fisher-Yates shuffle (aralashtirish)
   const shuffleArray = (array) => {
     const arr = [...array];
     for (let i = arr.length - 1; i > 0; i--) {
@@ -76,13 +74,14 @@ const MobileHomePage = () => {
         fetch("https://59159b0f4ee6c5cb.mokky.dev/dam_trix"),
       ]);
 
-      const [statusData, namozData, gymData, ishData, damData] = await Promise.all([
-        statusRes.json(),
-        namozRes.json(),
-        gymRes.json(),
-        ishRes.json(),
-        damRes.json(),
-      ]);
+      const [statusData, namozData, gymData, ishData, damData] =
+        await Promise.all([
+          statusRes.json(),
+          namozRes.json(),
+          gymRes.json(),
+          ishRes.json(),
+          damRes.json(),
+        ]);
 
       let updatedHero = {
         name: statusData.name || "Senpai",
@@ -97,74 +96,53 @@ const MobileHomePage = () => {
         streak: statusData.streak || 0,
         lastLogin: statusData.lastLogin || null,
       };
-      // Sana faqat "kun" bo‘yicha solishtiriladi
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
 
+      const today = new Date().toISOString().split("T")[0];
+
+      // seriya hisoblash
       let lastLoginDate = null;
       if (updatedHero.lastLogin) {
         lastLoginDate = new Date(updatedHero.lastLogin);
         lastLoginDate.setHours(0, 0, 0, 0);
       }
-
       if (!lastLoginDate) {
-        // Birinchi marta kirish
         updatedHero.streak = 1;
         updatedHero.lastLogin = new Date().toISOString();
-      } else if (lastLoginDate.getTime() < today.getTime()) {
-        // Oxirgi login kuni bugundan kichik bo‘lsa +1
+      } else if (lastLoginDate.getTime() < new Date(today).getTime()) {
         updatedHero.streak += 1;
         updatedHero.lastLogin = new Date().toISOString();
       }
-      // Agar lastLogin == today bo‘lsa hech narsa qilinmaydi (streak o‘zgarishsiz qoladi)
-
 
       let totalXP = 0;
+      let todayXP = 0;
       let totalGold = 0;
-      const allQuests = [];
+      const quests = [];
 
-      namozData.forEach((item) => {
-        totalXP += item.xp || 0;
-        allQuests.push({
-          id: item.id,
-          title: item.title,
-          status: item.status || "Jarayonda",
-          reward: `+${item.xp || 0} XP`,
+      const processData = (data, getTitle, getStatus) => {
+        data.forEach((item) => {
+          const xp = item.xp || 0;
+          totalXP += xp;
+          if (item.completedDate && item.completedDate.startsWith(today)) {
+            todayXP += xp;
+          }
+          quests.push({
+            id: item.id,
+            title: getTitle(item),
+            status: getStatus(item),
+            reward: `${xp >= 0 ? "+" : ""}${xp} XP${item.price ? `, +${item.price} 💰` : ""
+              }`,
+            date: item.completedDate || new Date().toISOString(),
+          });
         });
-      });
+      };
 
-      gymData.forEach((item) => {
-        totalXP += item.xp || 0;
-        allQuests.push({
-          id: item.id,
-          title: item.title,
-          status: item.status || "Jarayonda",
-          reward: `+${item.xp || 0} XP`,
-        });
-      });
+      processData(namozData, (item) => item.title, () => "Jarayonda");
+      processData(gymData, (item) => item.title, () => "Jarayonda");
+      processData(ishData, (item) => item.name, (item) =>
+        item.completed ? "Bajarildi" : "Jarayonda"
+      );
+      processData(damData, (item) => item.type, () => "Bajarildi");
 
-      ishData.forEach((item) => {
-        totalXP += item.xp || 0;
-        allQuests.push({
-          id: item.id,
-          title: item.name,
-          status: item.completed ? "Bajarildi" : "Jarayonda",
-          reward: `+${item.xp || 0} XP`,
-        });
-      });
-
-      damData.forEach((item) => {
-        totalXP += item.xp || 0;
-        totalGold += item.price || 0;
-        allQuests.push({
-          id: item.id,
-          title: item.type,
-          status: "Bajarildi",
-          reward: `+${item.xp || 0} XP, +${item.price || 0} 💰`,
-        });
-      });
-
-      // Level up
       const leveled = checkLevelUp(totalXP + updatedHero.xp, updatedHero.level);
       updatedHero = {
         ...updatedHero,
@@ -180,14 +158,22 @@ const MobileHomePage = () => {
         body: JSON.stringify(updatedHero),
       });
 
+      // 📌 eng oxirgi questni tepaga chiqarish
+      const sortedQuests = quests.sort(
+        (a, b) => new Date(b.date) - new Date(a.date)
+      );
+      const lastQuest = sortedQuests[0];
+      const otherQuests = shuffleArray(sortedQuests.slice(1));
+
+      setAllQuests([lastQuest, ...otherQuests]);
+
+      // 📌 bugungi XP va barcha XP
       setTodayStats({
-        xp: `+${totalXP}`,
-        quests: `${allQuests.length}/${allQuests.length}`,
+        xp: `${todayXP >= 0 ? "+" : ""}${todayXP}`,
+        totalXP: totalXP,
       });
 
-      setRecentQuests(shuffleArray(allQuests).slice(0, 5));
       setHero(updatedHero);
-
     } catch (error) {
       console.error("API xatolik:", error);
     } finally {
@@ -200,9 +186,7 @@ const MobileHomePage = () => {
   }, []);
 
   if (loading)
-    return (
-      <div className="text-white p-6 text-center">Yuklanmoqda...</div>
-    );
+    return <div className="text-white p-6 text-center">Yuklanmoqda...</div>;
 
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
@@ -211,7 +195,9 @@ const MobileHomePage = () => {
         <div className="flex items-center justify-between px-4 py-3 max-w-lg mx-auto">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center shadow-md border border-indigo-400/50">
-              <span className="font-bold text-yellow-300">{hero.name.charAt(0)}</span>
+              <span className="font-bold text-yellow-300">
+                {hero.name.charAt(0)}
+              </span>
             </div>
             <div>
               <h1 className="text-sm font-bold text-indigo-100">{hero.name}</h1>
@@ -223,7 +209,9 @@ const MobileHomePage = () => {
             className="px-3 py-2 bg-yellow-400/20 rounded-xl hover:bg-yellow-400/30 transition"
           >
             {showGold ? (
-              <span className="font-bold text-yellow-300">{hero.gold} 💰</span>
+              <span className="font-bold text-yellow-300">
+                {hero.gold} 💰
+              </span>
             ) : (
               <EyeOff size={18} className="text-yellow-200" />
             )}
@@ -238,8 +226,12 @@ const MobileHomePage = () => {
           <div className="bg-gradient-to-br from-indigo-800 via-purple-800 to-indigo-900 rounded-3xl p-6 shadow-[0_0_20px_rgba(99,102,241,0.6)] border border-indigo-500/40 relative overflow-hidden">
             <div className="absolute -top-6 -right-6 w-24 h-24 bg-indigo-600/30 rounded-full blur-2xl" />
             <div className="mb-3 text-center">
-              <h2 className="text-lg font-bold text-indigo-100">Level {hero.level}</h2>
-              <p className="text-xs text-indigo-400">{hero.streak} kunlik seriya 🔥</p>
+              <h2 className="text-lg font-bold text-indigo-100">
+                Level {hero.level}
+              </h2>
+              <p className="text-xs text-indigo-400">
+                {hero.streak} kunlik seriya 🔥
+              </p>
             </div>
 
             <div className="w-full h-3 bg-indigo-900/60 rounded-full overflow-hidden mb-2">
@@ -251,7 +243,8 @@ const MobileHomePage = () => {
               />
             </div>
             <p className="text-xs text-indigo-200 text-center mb-4">
-              {hero.xp} / {hero.xpNeeded} XP — {Math.round((hero.xp / hero.xpNeeded) * 100)}% to next level
+              {hero.xp} / {hero.xpNeeded} XP —{" "}
+              {Math.round((hero.xp / hero.xpNeeded) * 100)}% to next level
             </p>
 
             <div className="flex justify-around">
@@ -280,15 +273,17 @@ const MobileHomePage = () => {
             </div>
             <div className="w-px h-8 bg-indigo-600/40"></div>
             <div className="text-center">
-              <p className="text-xs text-indigo-300">Vazifalar</p>
-              <p className="text-green-300 font-bold">{todayStats.quests}</p>
+              <p className="text-xs text-indigo-300">Barcha XP</p>
+              <p className="text-green-300 font-bold">{todayStats.totalXP}</p>
             </div>
           </div>
         </div>
 
         {/* Quick Actions */}
         <div className="px-4 sm:px-6 mb-6 max-w-lg mx-auto">
-          <h3 className="text-base sm:text-lg font-bold mb-4 text-indigo-200 flex items-center">⚔️ O‘yin menyusi</h3>
+          <h3 className="text-base sm:text-lg font-bold mb-4 text-indigo-200 flex items-center">
+            ⚔️ O‘yin menyusi
+          </h3>
           <div className="grid grid-cols-4 gap-3 sm:gap-4">
             {quickActions.map((action, index) => {
               const IconComponent = action.icon;
@@ -297,10 +292,14 @@ const MobileHomePage = () => {
                   key={index}
                   className="flex flex-col items-center space-y-2 p-3 bg-gradient-to-br from-gray-900 to-indigo-900 rounded-2xl border border-indigo-500/30 hover:scale-105 transition transform duration-300"
                 >
-                  <div className={`p-2 sm:p-3 ${action.color} rounded-xl shadow-lg`}>
+                  <div
+                    className={`p-2 sm:p-3 ${action.color} rounded-xl shadow-lg`}
+                  >
                     <IconComponent size={20} className="text-white" />
                   </div>
-                  <span className="text-xs sm:text-sm font-medium text-indigo-100">{action.label}</span>
+                  <span className="text-xs sm:text-sm font-medium text-indigo-100">
+                    {action.label}
+                  </span>
                 </button>
               );
             })}
@@ -310,21 +309,48 @@ const MobileHomePage = () => {
         {/* Quest Log */}
         <div className="px-4 sm:px-6 mb-8 max-w-lg mx-auto">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base sm:text-lg font-bold text-indigo-200">📜 Vazifalar tarixi</h3>
-            <button className="text-yellow-400 text-xs sm:text-sm font-medium hover:text-yellow-300">Barchasi →</button>
+            <h3 className="text-base sm:text-lg font-bold text-indigo-200">
+              📜 Vazifalar tarixi
+            </h3>
+            <button className="text-yellow-400 text-xs sm:text-sm font-medium hover:text-yellow-300">
+              Barchasi →
+            </button>
           </div>
           <div className="space-y-3">
-            {recentQuests.map((quest) => (
-              <div key={quest.id} className="bg-gradient-to-br from-gray-900 to-indigo-900 rounded-2xl p-4 border border-indigo-600/40 hover:bg-indigo-800/60">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium text-sm sm:text-base text-indigo-100">{quest.title}</h4>
-                    <span className="text-xs text-indigo-400">{quest.status}</span>
+            {allQuests
+              .filter((quest) => {
+                const today = new Date();
+                const yesterday = new Date();
+                yesterday.setDate(today.getDate() - 1);
+
+                const questDate = new Date(quest.date);
+                const questDay = questDate.toISOString().split("T")[0];
+                const todayStr = today.toISOString().split("T")[0];
+                const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+                return questDay === todayStr || questDay === yesterdayStr;
+              })
+              .slice(0, 10) // faqat oxirgi 10 ta
+              .map((quest) => (
+                <div
+                  key={quest.id}
+                  className="bg-gradient-to-br from-gray-900 to-indigo-900 rounded-2xl p-4 border border-indigo-600/40 hover:bg-indigo-800/60"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium text-sm sm:text-base text-indigo-100">
+                        {quest.title}
+                      </h4>
+                      <span className="text-xs text-indigo-400">
+                        {quest.status}
+                      </span>
+                    </div>
+                    <span className="text-yellow-300 font-bold text-sm">
+                      {quest.reward}
+                    </span>
                   </div>
-                  <span className="text-yellow-300 font-bold text-sm">{quest.reward}</span>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
       </div>

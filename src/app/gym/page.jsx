@@ -126,6 +126,49 @@ const GymPage = () => {
         return task.date === today && task.status === 'bajarildi';
     }).length;
 
+
+    useEffect(() => {
+        const checkUncompletedTasks = () => {
+            const now = new Date();
+            const today = now.toISOString().split('T')[0];
+
+            // Agar soat 23:00 dan keyin bo'lsa
+            if (now.getHours() === 23 && now.getMinutes() === 0) {
+                dailyTasks.forEach(async (task) => {
+                    const alreadyCompleted = tasks.some(
+                        (t) => t.key === task.key && t.date === today
+                    );
+
+                    if (!alreadyCompleted) {
+                        const missedTask = {
+                            title: task.title,
+                            key: task.key,
+                            date: today,
+                            time: "23:00",
+                            status: "bajarilmadi",
+                            xp: -task.xp // ❌ minus XP
+                        };
+
+                        try {
+                            await fetch(API_URL, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify(missedTask),
+                            });
+                            console.log(`❌ ${task.title} bajarilmadi, -${task.xp} XP qo‘shildi`);
+                            fetchTasks(); // yangilash
+                        } catch (error) {
+                            console.error("Bajarilmagan mashqni yozishda xatolik:", error);
+                        }
+                    }
+                });
+            }
+        };
+
+        const interval = setInterval(checkUncompletedTasks, 60000); // har 1 daqiqada tekshiradi
+        return () => clearInterval(interval);
+    }, [tasks, dailyTasks]);
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white pb-20">
             {/* Header */}
